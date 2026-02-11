@@ -126,6 +126,79 @@ button{
   margin-bottom:8px;
   border-left:4px solid var(--highlight);
 }
+
+/* Forms */
+#loginForm, #signupForm, #postSection{
+  background:var(--panel);
+  padding:20px;
+  border-radius:12px;
+  margin-bottom:20px;
+  box-shadow:0 2px 8px rgba(0,0,0,.1);
+}
+
+#loginForm h3, #signupForm h3, #postSection h3{
+  margin-bottom:16px;
+  font-size:1.1rem;
+  color:var(--text);
+}
+
+#loginForm input, #signupForm input{
+  width:100%;
+  padding:10px;
+  margin-bottom:12px;
+  border:1px solid #ccc;
+  border-radius:8px;
+  font-size:14px;
+  background:var(--soft);
+  color:var(--text);
+  transition:border-color .2s;
+}
+
+#loginForm input:focus, #signupForm input:focus{
+  outline:none;
+  border-color:var(--accent);
+  box-shadow:0 0 0 3px rgba(52,152,219,.1);
+}
+
+#postSection textarea{
+  width:100%;
+  padding:10px;
+  margin-bottom:12px;
+  border:1px solid #ccc;
+  border-radius:8px;
+  font-size:14px;
+  background:var(--soft);
+  color:var(--text);
+  font-family:inherit;
+  resize:vertical;
+  min-height:100px;
+  transition:border-color .2s;
+}
+
+#postSection textarea:focus{
+  outline:none;
+  border-color:var(--accent);
+  box-shadow:0 0 0 3px rgba(52,152,219,.1);
+}
+
+#loginForm button, #signupForm button, #postSection button{
+  width:100%;
+  padding:10px;
+  background:var(--accent);
+  color:#fff;
+  border:none;
+  border-radius:8px;
+  font-size:14px;
+  font-weight:500;
+  cursor:pointer;
+  transition:.2s;
+}
+
+#loginForm button:hover, #signupForm button:hover, #postSection button:hover{
+  background:#2980b9;
+  transform:translateY(-2px);
+  box-shadow:0 4px 12px rgba(52,152,219,.3);
+}
 </style>
 </head>
 
@@ -137,9 +210,12 @@ button{
     <h2>📖 Bible Study Journal</h2>
     <small>Fast • Highlight • Reflect</small>
   </div>
-  <button class="toggle-btn" onclick="toggleDark()">
-    <span id="icon">🌙</span>
-  </button>
+  <div style="display:flex;gap:8px;align-items:center">
+    <button class="toggle-btn" onclick="toggleDark()">
+      <span id="icon">🌙</span>
+    </button>
+    <button onclick="logout()" style="padding:8px 12px;background:#e74c3c">Logout</button>
+  </div>
 </header>
 
 <div class="controls">
@@ -151,12 +227,31 @@ button{
 
 <div class="verse-grid" id="verseGrid"></div>
 
+<!-- Posting Section -->
+<div id="postSection">
+  <h3>Post a Question</h3>
+  <textarea id="postContent" placeholder="Ask a question..."></textarea>
+  <button onclick="postQuestion()">Post</button>
+</div>
+
 <h3 style="margin:18px 0 8px">Highlighted Notes</h3>
 <div id="highlightNotes"></div>
+
+<button onclick="exportComments()" style="margin-top:16px">Export Comments</button>
 
 </div>
 
 <script>
+/* Check if user is authenticated */
+if(!localStorage.getItem('userId')){
+  window.location.href = 'auth.html';
+}
+
+function logout(){
+  localStorage.removeItem('userId');
+  window.location.href = 'auth.html';
+}
+
 /* ---------------- DATA ---------------- */
 const versions=[
   {id:"kjv",label:"KJV"},
@@ -180,69 +275,25 @@ const books=[ "Genesis","Exodus","Leviticus","Numbers","Deuteronomy","Joshua","J
 books.forEach(b=>{
   const o=document.createElement("option");
   o.value=b;o.textContent=b;
-  book.appendChild(o);
+  document.getElementById("book").appendChild(o);
 });
 
-/* Chapter dropdown (1–150) */
 for(let i=1;i<=150;i++){
   const o=document.createElement("option");
   o.value=i;o.textContent=`Chapter ${i}`;
-  chapter.appendChild(o);
+  document.getElementById("chapter").appendChild(o);
 }
 
-/* Verse dropdown (1–176 max possible) */
 function populateVerses(){
-  verse.innerHTML="";
+  document.getElementById("verse").innerHTML="";
   for(let i=1;i<=176;i++){
     const o=document.createElement("option");
     o.value=i;o.textContent=`Verse ${i}`;
-    verse.appendChild(o);
+    document.getElementById("verse").appendChild(o);
   }
 }
 populateVerses();
-chapter.onchange=populateVerses;
-
-/* ---------------- STATE ---------------- */
-let highlights=JSON.parse(localStorage.getItem("highlights"))||[];
-const verseCache={};
-
-/* ---------------- DARK MODE ---------------- */
-const icon=document.getElementById("icon");
-if(localStorage.getItem("dark")==="true"){
-  document.body.classList.add("dark");
-  icon.textContent="☀️";
-}
-function toggleDark(){
-  document.body.classList.toggle("dark");
-  const d=document.body.classList.contains("dark");
-  icon.textContent=d?"☀️":"🌙";
-  localStorage.setItem("dark",d);
-}
-
-/* ---------------- GRID ---------------- */
-function initGrid(){
-  verseGrid.innerHTML="";
-  for(let i=0;i<6;i++){
-    const box=document.createElement("div");
-    box.className="verse-box";
-    box.innerHTML=`
-      <select class="version-select"></select>
-      <div class="verse-display" id="verse-${i}">Loading…</div>
-    `;
-    verseGrid.appendChild(box);
-
-    const sel=box.querySelector("select");
-    versions.forEach(v=>{
-      const o=document.createElement("option");
-      o.value=v.id;o.textContent=v.label;
-      sel.appendChild(o);
-    });
-    sel.value=versions[i%versions.length].id;
-    sel.onchange=()=>loadVerse(i,sel.value);
-  }
-  preloadAll();
-}
-initGrid();
+document.getElementById("chapter").onchange=populateVerses;
 
 /* ---------------- FAST LOAD ---------------- */
 function preloadAll(){
@@ -308,6 +359,7 @@ function renderNotes(){
       </div>`).join("") || "<small>No highlights yet.</small>";
 }
 renderNotes();
+
 </script>
 </body>
 </html>
